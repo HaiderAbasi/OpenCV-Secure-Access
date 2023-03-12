@@ -28,9 +28,14 @@ for image_file in os.listdir(image_dir_path):
     
     image_path = os.path.join(image_dir_path, image_file)
     
-    try:
-        result = face_recog.verify(search_image_path, image_path,enforce_detection=True,align=True,normalization="base")
-    except ValueError:
+    # Step # 1 & 2 (Detection + Alignment)
+    img_1_objs, img_2_objs = face_recog.get_faces(search_image_path,image_path)
+    
+    if img_1_objs is not None and img_2_objs is not None:
+        # If faces found:
+        # Step # 2 & 3 (Representation + Verfication)
+        result = face_recog.verify(img_1_objs, img_2_objs,normalization="base")
+    else:
         # Ignore the image if no face is detected
         print("No face was detected in the current image.\nSkipping....")
         continue
