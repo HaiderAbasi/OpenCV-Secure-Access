@@ -152,3 +152,8 @@ class Detector:
 
         return path + "/data/"
 
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["detector"]
+        return state
