@@ -4,6 +4,7 @@ ignore_Warning_MMSF = True
 experimental = False
 nvidia_gpu = False
 
+# Video Path or camera number
 vid_id = None
 
 # Debugging controls
@@ -24,5 +25,4 @@ exp_height = 480
 downscale = 2 # Seems adequate for video size of (Width,Height) = (640,480) ... After downsizing (320,240)
 new_user = None
 authorized_dir = r"authorized_personnels"
-
 recog_tolerance = 0.6

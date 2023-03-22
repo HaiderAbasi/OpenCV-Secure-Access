@@ -20,7 +20,7 @@ import face_recognition # Reference (Cross-Platform-Path) = https://stackoverflo
 # Utility Imports
 import config
 from collections import deque
-from utilities import putText,get_iou,to_ltrd,to_ltwh,draw_fancy_bbox
+from utilities import get_iou,to_ltrd,to_ltwh,draw_fancy_bbox
 
 
 class secure_access_cv:
@@ -38,21 +38,24 @@ class secure_access_cv:
         self.executor = concurrent.futures.ProcessPoolExecutor(max_workers=4)
         self.start_time = None
         self.futures = None
-
-        self.face_names_chars = Array('c', 100) # Array of integer type of length 4 ==> Used here for sharing the computed bbox
-
-        self.currently_recognizing = "Single"# 1: Single, Multiple, Appended
         
-        self.invoke_screenlock = False
-        self.max_wait = 50
-        self.lock_iter = 0
+        # Array of integer type of length 4 ==> Used here for sharing the computed bbox
+        self.face_names_chars = Array('c', 100) 
+        # 1: Single, Multiple, Appended
+        self.currently_recognizing = "Single"
         
+        # Voting System for robust authorization system
         self.voting_dict = {} # Votes for each tracked object      
         self.time_after_recognize = [4,8,16,32,64,128,248] # Wait time before tracked face can be recognized again
         self.tar_counter = {} # index for each tracked face indicating after how many sec we will perform recogniton again
         self.last_recog_time = {} # Last recognition time for each tracked face
         self.perform_recog = {} # perform recognition for selected faces
-        self.identifying_faces = False
+        self.identifying_faces = False # Performing face identification at this iteration?
+
+        # Device Action Variables
+        self.invoke_screenlock = False
+        self.max_wait = 50
+        self.lock_iter = 0
         
              
     def update_state(self,frame):
@@ -89,18 +92,13 @@ class secure_access_cv:
                 if self.identifying_faces:
                     print("\n Identifying Faces....")
                     extract_recog_result_start = time.time()
-                    # Asynchrnous plant detection has been completed. You may retrieve the plant location now
-                    # [Beware]: Time has elasped since estimated plantrow mask was passed. Drone would have moved by now
-                    #            Adjust for the drone pose change [Rotation & Position] applying odometry changes to the computed bbox
                     
                     try:
                         self.face_names_chars = self.futures.result(timeout=0.005)  # wait up to 1 milli second for the result
                     except concurrent.futures._base.TimeoutError:
                         # executor is busy, skip this task
                         return
-                    
-                    #self.face_names_chars = self.futures.result()
-                    
+                                        
                     extract_recog_result_mini_time = time.time() - extract_recog_result_start
                     print(f"** extract_recog_result_mini_time = {extract_recog_result_mini_time}** ")
                     
@@ -213,7 +211,6 @@ class secure_access_cv:
         dth_frame = 15
         upsample_detection = 1
         if config.debug:
-            #dth_frame = 2
             upsample_detection = 2
         
         frame_iter = 0 # Current frame iteration
@@ -418,6 +415,7 @@ class secure_access_cv:
         # Release handle to the webcam
         cap.release()
         cv2.destroyAllWindows()
+
 
     def __getstate__(self):
         d = self.__dict__.copy()

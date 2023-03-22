@@ -13,13 +13,15 @@ class multitracker:
         self.tracker_type = tracker_type
 
         self.mode = "Detection"
-        self.tracked_bboxes = [] # [(left,top,width,height)...]
+        self.Tracked_classes = []
+        self.colors = []        
         self.obj_type = "id"
 
-        self.obj_iter = 1
-        self.Tracked_classes = []
-        self.unique_ids = []
-        self.colors = []        
+        # List of Tracked bboxes for accessibility
+        self.tracked_bboxes = [] # [(left,top,width,height)...]
+        self.unique_ids = [] # Unique id for each tracked object
+        self.obj_iter = 1 # Unique id is generated in order
+                          # the track object was initailized
 
     def tracker_create(self):
         if self.tracker_type == "MOSSE":
@@ -44,6 +46,7 @@ class multitracker:
             if success:
                 self.tracked_bboxes = []
                 for rct in boxes:
+                    # Appending tracked bboxes to list
                     self.tracked_bboxes.append((round(rct[0],1),round(rct[1],1),round(rct[2],1),round(rct[3],1)))
             elif draw:
                 print("Tracking Failed")
@@ -51,28 +54,19 @@ class multitracker:
             # Calculate Frames per second (FPS)
             fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
 
-            # Draw bounding box
             # draw tracked objects
             Grant_access = False
             if success:
                 for i, newbox in enumerate(boxes):
                     p1 = (int(newbox[0]), int(newbox[1]))
-                    # p2 = (left        +  width    ,   top         +  height  )
-                    p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3])) 
-                    
-                    #draw_fancy_bbox(frame_draw, p1, p2, (255, 0, 105),4, 15, 10)
+                    p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))    
                     draw_fancy_bbox(frame_draw, p1, p2, self.colors[i],4, 15, 10)
-
-                    #cv2.rectangle(frame_draw, p1, p2, self.colors[i], 3, 1)
-                    #cv2.putText(frame_draw,f"{self.obj_type}_{self.Tracked_classes[i]}",(p1[0],p1[1]-20),cv2.FONT_HERSHEY_DUPLEX,1,(128,0,255))
                     cv2.putText(frame_draw,f"{self.Tracked_classes[i]}",(p1[0],p1[1]-20),cv2.FONT_HERSHEY_DUPLEX,1.0,(128,0,255),2)
-                    #cv2.putText(frame_draw,f"{self.unique_ids[i]}",(p1[0],p1[1]-40),cv2.FONT_HERSHEY_DUPLEX,1.0,(128,0,255),2)
                     if self.colors[i] == (0,255,0):
                         Grant_access = True
                         
                 if Grant_access and config.display_state:    
                     cv2.putText(frame_draw,f">>> Access granted <<<",(int(frame_draw.shape[1]/2)-120,25),cv2.FONT_HERSHEY_DUPLEX,0.7,(0,128,0),2)
-
             else:
                 self.mode = "Detection"
                 if draw:
@@ -91,6 +85,7 @@ class multitracker:
                 self.m_tracker = cv2.MultiTracker_create()            
                 self.colors.clear() # Colors would have also been initialized along with the tracker, Clear it!
                 self.Tracked_classes.clear()
+                # Resetting unique id list to only carry ids of currently tracked objects
                 self.unique_ids.clear()
 
 
@@ -99,11 +94,13 @@ class multitracker:
                 if ( (bbox !=[]) and (bbox[2] != 0) and (bbox[3] != 0) ): # Sane bbox (y)
                     tracker = self.tracker_create()
                     self.m_tracker.add(tracker, frame, tuple(bbox))
-                    self.tracked_bboxes = [] # Resetting tracked bboxes
                     self.mode = "Tracking" # Set mode to tracking
                     self.Tracked_classes.append(f"{self.obj_iter}") # keep tracking frame sign name
-                    self.unique_ids.append(f"{self.obj_iter}")
                     self.colors.append((0,144,255)) # Orange for (Recognizer not applied yet) detections
+                    # Appending tracked object unique id
+                    self.unique_ids.append(f"{self.obj_iter}")
+                    self.tracked_bboxes = [] # Resetting tracked bboxes
+                    # Incrementing obj_iter to move to next tracked object
                     self.obj_iter = self.obj_iter + 1
 
 
@@ -150,11 +147,13 @@ def demo():
                 start_time = time.time()
                 m_tracker.track(frame,frame_disp)
 
+                # if objects were tracked
                 if len(m_tracker.tracked_bboxes)!=0:
                     fps = 1.0 / (time.time() - start_time) if (time.time() - start_time)!=0 else 100.00
                     fps_txt = f"FPS: = {fps:.2f}"
                     putText(frame, f"Tracking ( {tracker_type} ) at {fps_txt}",(20,20))
                 else:
+                    # else reset mode to detection
                     m_tracker.mode = "Detection" # Reset to Detection
             else:
                 putText(frame, f"Detection",(20,20))
