@@ -15,7 +15,6 @@ class multitracker:
         self.mode = "Detection"
         self.Tracked_classes = []
         self.colors = []        
-        self.obj_type = "id"
 
         # List of Tracked bboxes for accessibility
         self.tracked_bboxes = [] # [(left,top,width,height)...]
@@ -31,35 +30,23 @@ class multitracker:
         if self.tracker_type == "CSRT":
             return(cv2.TrackerCSRT_create())
 
-    def track(self,frame,frame_draw,bboxes=[],obj_type = "",draw = False):
-        if obj_type!="":
-            self.obj_type = obj_type
+    def track(self,frame,frame_draw,bboxes=[]):
             
         # 4. Checking if SignTrack Class mode is Tracking If yes Proceed
         if(self.mode == "Tracking"):
-            
-            # Start timer
-            timer = cv2.getTickCount()
 
             # get updated location of objects in subsequent frames
             success, boxes = self.m_tracker.update(frame)
-            if success:
-                self.tracked_bboxes = []
-                for rct in boxes:
-                    # Appending tracked bboxes to list
-                    self.tracked_bboxes.append((round(rct[0],1),round(rct[1],1),round(rct[2],1),round(rct[3],1)))
-            elif draw:
-                print("Tracking Failed")
-                
-            # Calculate Frames per second (FPS)
-            fps = cv2.getTickFrequency() / (cv2.getTickCount() - timer)
 
             # draw tracked objects
             Grant_access = False
             if success:
-                for i, newbox in enumerate(boxes):
-                    p1 = (int(newbox[0]), int(newbox[1]))
-                    p2 = (int(newbox[0] + newbox[2]), int(newbox[1] + newbox[3]))    
+                self.tracked_bboxes = []
+                for i, rct in enumerate(boxes):
+                    # Appending tracked bboxes to list
+                    self.tracked_bboxes.append((round(rct[0],1),round(rct[1],1),round(rct[2],1),round(rct[3],1)))
+                    p1 = (int(rct[0]), int(rct[1]))
+                    p2 = (int(rct[0] + rct[2]), int(rct[1] + rct[3]))    
                     draw_fancy_bbox(frame_draw, p1, p2, self.colors[i],4, 15, 10)
                     cv2.putText(frame_draw,f"{self.Tracked_classes[i]}",(p1[0],p1[1]-20),cv2.FONT_HERSHEY_DUPLEX,1.0,(128,0,255),2)
                     if self.colors[i] == (0,255,0):
@@ -69,13 +56,8 @@ class multitracker:
                     cv2.putText(frame_draw,f">>> Access granted <<<",(int(frame_draw.shape[1]/2)-120,25),cv2.FONT_HERSHEY_DUPLEX,0.7,(0,128,0),2)
             else:
                 self.mode = "Detection"
-                if draw:
-                    # Tracking failure
-                    cv2.putText(frame_draw, "Tracking failure detected", (100,80), cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
 
-            if draw:
-                # Display FPS on frame
-                cv2.putText(frame_draw, "FPS : " + str(int(fps)), (100,50), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (50,170,50), 2);
+
        
         # 3. If SignTrack is in Detection Mode -> Proceed to intialize tracker
         elif (self.mode == "Detection"):

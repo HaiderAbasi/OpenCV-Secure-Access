@@ -257,7 +257,7 @@ class secure_access_cv:
                     # Initialize tracker with bboxes or face_locations (based on detector used) 
                     inp_formats = ["css"]*len(face_locations_frame)
                     faces_hog = list( map(to_ltwh,face_locations_frame,inp_formats) )
-                    self.m_tracker.track(frame,frame_draw,faces_hog,"face") # Initialize Tracker
+                    self.m_tracker.track(frame,frame_draw,faces_hog) # Initialize Tracker
 
                     
                     if not self.futures or not self.futures.running():
@@ -312,7 +312,7 @@ class secure_access_cv:
                     already_tracked = [np.array(t_bbox) for t_bbox in self.m_tracker.tracked_bboxes]
                     init_bboxes = [*already_tracked,*new_bboxes]
                     self.m_tracker.mode = "Detection"
-                    self.m_tracker.track(frame,frame_draw,init_bboxes,"face") # Appending new found bboxes to already tracked
+                    self.m_tracker.track(frame,frame_draw,init_bboxes) # Appending new found bboxes to already tracked
 
                     if not self.futures or not self.futures.running():
                         # if the previous future has completed or has not started yet, cancel it
@@ -402,7 +402,7 @@ class secure_access_cv:
             if config.debug:
                 waitTime = 33
             
-            if config.display:
+            if config.display or config.debug:
                 cv2.imshow('Video', frame_draw)
                 # Hit 'Esc' on the keyboard to quit!
                 k = cv2.waitKey(waitTime)            
