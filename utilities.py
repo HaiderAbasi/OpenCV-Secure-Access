@@ -6,8 +6,91 @@ import numpy as np
 def print_h(str):
     print(f"\n##############################################\n{str}")
 
+def put_Text(
+    img,
+    text,
+    uv_top_left,
+    bg_color=(255, 255, 255),
+    text_color=(255, 255, 255),
+    fontScale=0.6,
+    thickness=1,
+    fontFace=cv2.FONT_HERSHEY_SIMPLEX,
+    outline_color=(0,0,0),
+    line_spacing=1.5,
+):
+    """
+    Draws multiline with an outline and a background slightly larger than the text.
+    """
+    assert isinstance(text, str)
+
+    uv_top_left = np.array(uv_top_left, dtype=float)
+    assert uv_top_left.shape == (2,)
+
+    # Calculate the size of the text box
+    text_size = np.zeros((2,))
+    for line in text.splitlines():
+        (w, h), _ = cv2.getTextSize(
+            text=line,
+            fontFace=fontFace,
+            fontScale=fontScale,
+            thickness=thickness,
+        )
+        text_size[0] = max(text_size[0], w)
+        text_size[1] += h * line_spacing
+
+    # Calculate the top-left and bottom-right coordinates of the background box
+    bg_size = text_size + np.array([10, 10])  # add some padding around the text
+    bg_top_left = uv_top_left - [5, 5]
+    bg_bottom_right = bg_top_left + bg_size
+
+    # Draw the background box
+    draw_fancy_bbox(
+        img=img,
+        pt1=tuple(bg_top_left.astype(int)),
+        pt2=tuple(bg_bottom_right.astype(int)),
+        color=bg_color,
+        thickness=2,
+    )
+
+    # Draw the text
+    for line in text.splitlines():
+        (w, h), _ = cv2.getTextSize(
+            text=line,
+            fontFace=fontFace,
+            fontScale=fontScale,
+            thickness=thickness,
+        )
+        uv_bottom_left_i = uv_top_left + [0, h]
+        org = tuple(uv_bottom_left_i.astype(int))
+
+        if outline_color is not None:
+            cv2.putText(
+                img,
+                text=line,
+                org=org,
+                fontFace=fontFace,
+                fontScale=fontScale,
+                color=outline_color,
+                thickness=thickness * 3,
+                lineType=cv2.LINE_AA,
+            )
+        cv2.putText(
+            img,
+            text=line,
+            org=org,
+            fontFace=fontFace,
+            fontScale=fontScale,
+            color=text_color,
+            thickness=thickness,
+            lineType=cv2.LINE_AA,
+        )
+
+        uv_top_left += [0, h * line_spacing]
+
+
+
 def putText(img, text,org=(0, 0),font=cv2.FONT_HERSHEY_PLAIN,fontScale=1,color=(0, 255, 0),thickness=1,color_bg=(0, 0, 0)):
-    FONT_SCALE = 3e-3  # Adjust for larger font size in all images
+    FONT_SCALE = 2.5e-3  # Adjust for larger font size in all images
     THICKNESS_SCALE = 2e-3  # Adjust for larger thickness in all images
 
     if fontScale==1:

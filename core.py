@@ -6,7 +6,7 @@ import os
 
 # Multiprocessing Imports
 import concurrent.futures
-from multiprocessing import Array,freeze_support,active_children
+from multiprocessing import freeze_support,active_children
 
 # System Imports
 import subprocess
@@ -20,7 +20,7 @@ import face_recognition # Reference (Cross-Platform-Path) = https://stackoverflo
 # Utility Imports
 import config
 from collections import deque
-from utilities import get_iou,to_ltrd,to_ltwh,draw_fancy_bbox
+from utilities import get_iou,to_ltrd,to_ltwh,draw_fancy_bbox,put_Text
 
 
 class secure_access_cv:
@@ -39,8 +39,8 @@ class secure_access_cv:
         self.start_time = None
         self.futures = None
         
-        # Array of integer type of length 4 ==> Used here for sharing the computed bbox
-        self.face_names_chars = Array('c', 100) 
+        # Container to hold the rerieved face identities from the face recognizer.
+        self.face_identities = []
         # 1: Single, Multiple, Appended
         self.currently_recognizing = "Single"
         
@@ -72,9 +72,12 @@ class secure_access_cv:
         fps = (sum(self.fps_queue)/len(self.fps_queue))
         #fps_txt = f"{self.tracker.mode}: ( {self.tracker.tracker_type} ) at {fps:.2f} FPS"
         fps_txt = f"{fps:.2f} FPS"
-        cv2.putText(frame, fps_txt ,(20,40) ,cv2.FONT_HERSHEY_DUPLEX, 1, (255,0,0))
-        cv2.putText(frame, f"Detector = {config.face_detector}, Mode = {self.m_tracker.mode}" ,(20,160) ,cv2.FONT_HERSHEY_DUPLEX, 1, (0,255,0))
-      
+        cv2.putText(frame, fps_txt ,(15,40) ,cv2.FONT_HERSHEY_DUPLEX, 0.7, (255,0,0))
+        # get all active child processes
+        children = active_children()
+        # Updating and displaying application status
+        app_state = f"Detector = {config.face_detector}, Mode = {self.m_tracker.mode} \n{self.currently_recognizing} face/es - {len(children)} subprocess!"
+        put_Text(frame,app_state,(20,60))
         
     def identify(self):
         """
@@ -94,27 +97,16 @@ class secure_access_cv:
                     extract_recog_result_start = time.time()
                     
                     try:
-                        self.face_names_chars = self.futures.result(timeout=0.005)  # wait up to 1 milli second for the result
+                        self.face_identities = self.futures.result(timeout=0.005)  # wait up to 1 milli second for the result
                     except concurrent.futures._base.TimeoutError:
                         # executor is busy, skip this task
                         return
                                         
                     extract_recog_result_mini_time = time.time() - extract_recog_result_start
                     print(f"** extract_recog_result_mini_time = {extract_recog_result_mini_time}** ")
-                    
-                    # 0) Transferring data from a shared array to a list
-                    face_names_chars_list = list(self.face_names_chars)
-                    # 1) Removing garbadge values
-                    if '0' in face_names_chars_list:
-                        end_idx = face_names_chars_list.index('0')
-                        face_names_chars_list = face_names_chars_list[0:end_idx]
-                    # 2) Creating string from the list of chars
-                    face_names_str = ''.join(face_names_chars_list)
-                    # 3) Seperating face-names on seperater ','
-                    face_names = face_names_str.split(",")
 
 
-                    for iter, name in enumerate(face_names):
+                    for iter, name in enumerate(self.face_identities):
                         unique_id = self.m_tracker.unique_ids[iter] # get the unique_id for the tracked object
                         
                         if name != "Unknown":
@@ -141,7 +133,7 @@ class secure_access_cv:
                         self.m_tracker.Tracked_classes[iter] = face_label                  
                   
                   
-                    for iter, name in enumerate(face_names):
+                    for iter, name in enumerate(self.face_identities):
                         unique_id = self.m_tracker.unique_ids[iter] # get the unique_id for the tracked object
                         # Recognition was done on tracked face- We have its unique id.
                         #  We use unique-id to note down its last recogniton time
@@ -223,8 +215,11 @@ class secure_access_cv:
                 break
             frame_draw = frame.copy()
             
+            # Containers: Hold detected faces and downsized frame
             face_locations = [] # (top, right, bottom, left) css
+            face_locations_scaled = []
             rgb_small_frame = None
+            
             # Step 1: Detecting face on every dth_frame             
             if frame_iter%dth_frame==0:
                 # Resize frame of video to 1/4 size for faster face recognition processing
@@ -240,9 +235,9 @@ class secure_access_cv:
                 for face_loc in face_locations:
                     face_loc_scaled = (face_loc[0]*config.downscale,face_loc[1]*config.downscale,
                                        face_loc[2]*config.downscale,face_loc[3]*config.downscale)
+                    face_locations_scaled.append(face_loc_scaled)
                     top, right, bottom, left = face_loc_scaled
                     cv2.rectangle(frame_draw,(left,top),(right,bottom),(255,0,0),4)
-
 
             # Step 2: Start Tracking if faces are present
             if self.m_tracker.mode =="Detection":
@@ -251,14 +246,11 @@ class secure_access_cv:
                         self.currently_recognizing = "Multiple"
                     else:
                         self.currently_recognizing = "Single"
-                       
-                    rgb_small_frame, face_locations,face_locations_frame = self.face_recog.preprocess(frame,frame_draw,rgb_small_frame,[],face_locations)
-                    
+                                           
                     # Initialize tracker with bboxes or face_locations (based on detector used) 
-                    inp_formats = ["css"]*len(face_locations_frame)
-                    faces_hog = list( map(to_ltwh,face_locations_frame,inp_formats) )
-                    self.m_tracker.track(frame,frame_draw,faces_hog) # Initialize Tracker
-
+                    inp_formats = ["css"]*len(face_locations_scaled)
+                    face_bboxes = list( map(to_ltwh,face_locations_scaled,inp_formats) )
+                    self.m_tracker.track(frame,frame_draw,face_bboxes) # Initialize Tracker
                     
                     if not self.futures or not self.futures.running():
                         # if the previous future has completed or has not started yet, cancel it
@@ -332,6 +324,7 @@ class secure_access_cv:
                     # Perform recogntion again if its not already run and a face has not been recognized 
                     # for a long time
                     if ( not self.futures.running() and any(self.perform_recog.values()) ):
+                        # Case #3: Faces were detected but all were already tracked
                         #print("Performing recognition again.....")
                         recog_while_track_start = time.time()
                         # if the previous future has completed or has not started yet, cancel it
@@ -343,17 +336,15 @@ class secure_access_cv:
                         # reset calls:
                         for ids in self.perform_recog.keys():
                             self.perform_recog[ids] = False
-                        # # Call recognition captain. And we are assuming we are using hog.
-                        #tracked_bboxes = [np.array(t_bbox) for t_bbox in self.m_tracker.tracked_bboxes]
-                        # [New evidence added]: If child process is not already executing --> Start recognizer
-                        rgb_small_frame, face_locations,_ = self.face_recog.preprocess(frame,frame_draw,rgb_small_frame,[],face_locations)
 
                         # Perform recognition on detected faces as a seperate child process to avoid halting main process
                         self.futures = self.executor.submit(self.face_recog.recognize,rgb_small_frame,face_locations,data)
                         
                         self.start_time = time.time()
                         self.identifying_faces = True
-                        self.currently_recognizing = "Appended"
+                        self.currently_recognizing = "Single"
+                        if len(face_locations)>1:
+                            self.currently_recognizing = "Multiple"
                         recog_while_track_time = recog_while_track_start - time.time()
                         print(f"** recog_while_track_time = {recog_while_track_time}** ")
                                                 
@@ -368,11 +359,7 @@ class secure_access_cv:
             if config.display_state:
                 # Updating state to current for displaying...
                 self.update_state(frame_draw)
-                # get all active child processes
-                children = active_children()
-                cv2.putText(frame_draw,f"Recognizing {self.currently_recognizing} face/es  with {len(children)} subprocess running!", ( 20,200 ) ,cv2.FONT_HERSHEY_DUPLEX, 1, (128,128,128))
-                cv2.putText(frame_draw, f"Processing took  = {self.elapsed_time:.2f} ms" ,(20,120) ,cv2.FONT_HERSHEY_DUPLEX, 1, (0,0,128))
-
+                
 
             if self.invoke_screenlock:
                 s=(5,5)
@@ -422,7 +409,6 @@ class secure_access_cv:
         # Delete all unpicklable attributes.
         del d['executor']
         del d['future']
-        del d['face_names_chars']
         del d['m_tracker']
         return d
 
