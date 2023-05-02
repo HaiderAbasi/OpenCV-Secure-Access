@@ -69,6 +69,7 @@ class multitracker:
                 
                 # Resetting unique id list to only carry ids of currently tracked objects
                 self.unique_ids.clear()
+                self.tracked_bboxes.clear() # Resetting tracked bboxes
 
 
             # Initialize MultiTracker
@@ -82,7 +83,6 @@ class multitracker:
                     
                     # Appending tracked object unique id
                     self.unique_ids.append(f"{self.obj_iter}")
-                    self.tracked_bboxes = [] # Resetting tracked bboxes
                     # Incrementing obj_iter to move to next tracked object
                     self.obj_iter = self.obj_iter + 1
 
@@ -117,8 +117,6 @@ def demo():
 
 
     while True:
-        #debugger.update_variables() # Get updated variables
-        #data_iter = debugger.debug_vars[0]
 
         ret, frame = cap.read()
         if frame is None:

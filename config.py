@@ -9,7 +9,7 @@ vid_id = None
 
 # Debugging controls
 display = False
-debug = True
+debug = False
 display_state = False
 
 # Detection Flags

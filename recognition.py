@@ -17,62 +17,6 @@ class face_recognition_dlib():
         self.default_embeddings_path = os.path.join(os.path.dirname(__file__),"models/live_embeddings-face_enc")
         self.preprocess_resize = 4 # Downscaling 4 times to improve computation time
 
-
-    def generate_embeddings(self,data_dir,make_default = False,opentxtmode = "wb"):
-
-        if config.debug:
-            foldername = os.path.basename(data_dir)
-        else:
-            foldername = os.path.basename(config.authorized_dir)
-        embeddings_path = os.path.join(os.path.dirname(__file__),f"models/{foldername}-live_embeddings-face_enc")
-        #get paths of each file in folder named Images
-        #Images here contains my data(folders of various persons) i.e. Friends/..
-        imagePaths = list(list_images(os.path.join(os.path.dirname(__file__),data_dir)))
-        if imagePaths == []:
-            print(f"\n[Error]: No training-images found at {data_dir}")
-            sys.exit(0)
-        knownEncodings = []
-        knownNames = []
-        # loop over the image paths
-        for (i, imagePath) in enumerate(imagePaths):
-            # extract the person name from the image path (folder name)
-            name = imagePath.split(os.path.sep)[-2]
-            # load the input image and convert it from BGR (OpenCV ordering)
-            # to dlib ordering (RGB)
-            image = cv2.imread(imagePath)
-            rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            #Use Face_recognition to locate faces
-            boxes = face_recognition.face_locations(rgb,model='hog')
-            # compute the facial embedding for the face
-            encodings = face_recognition.face_encodings(rgb, boxes)
-            # loop over the encodings
-            for encoding in encodings:
-                knownEncodings.append(encoding)
-                knownNames.append(name)
-        #save emcodings along with their names in dictionary data
-        data = {"encodings": knownEncodings, "names": knownNames}
-        
-        if opentxtmode == "ab":
-            #print("Appending Data = ",data,f" to {embeddings_path}")
-            # load the known faces and embeddings saved in last file
-            orig_data = pickle.loads(open(embeddings_path, "rb").read())
-            data["encodings"] = orig_data["encodings"] + data["encodings"]
-            data["names"]     = orig_data["names"]     + data["names"]
-        
-        #use pickle to save data into a file named after the data folder for later use
-        f = open(embeddings_path,"wb")
-        f.write(pickle.dumps(data))
-        f.close()
-        
-        if make_default:
-            sleep(1)
-            print(f"\nSetting current embedding at {embeddings_path} as default({self.default_embeddings_path}).")
-            #use pickle to save data into a file named after the data folder for later use
-            f = open(self.default_embeddings_path,"wb")
-            f.write(pickle.dumps(data))
-            f.close()
-
-
     @staticmethod
     def create_user_dataset(user_dataset_dir):
         # [1: Face Detector] Loading cascade classifier as the fastest face detector in OpenCV
@@ -179,7 +123,62 @@ class face_recognition_dlib():
             print(f"Dataset already available at {user_dataset_dir}\n")
         print(f"Generating {config.new_user} embeddings and appending to authorized personnel list.")
         self.generate_embeddings(user_dataset_dir,True,opentxtmode="ab")
-    
+
+    def generate_embeddings(self,data_dir,make_default = False,opentxtmode = "wb"):
+
+        if config.debug:
+            foldername = os.path.basename(data_dir)
+        else:
+            foldername = os.path.basename(config.authorized_dir)
+        embeddings_path = os.path.join(os.path.dirname(__file__),f"models/{foldername}-live_embeddings-face_enc")
+        #get paths of each file in folder named Images
+        #Images here contains my data(folders of various persons) i.e. Friends/..
+        imagePaths = list(list_images(os.path.join(os.path.dirname(__file__),data_dir)))
+        if imagePaths == []:
+            print(f"\n[Error]: No training-images found at {data_dir}")
+            sys.exit(0)
+        knownEncodings = []
+        knownNames = []
+        # loop over the image paths
+        for (i, imagePath) in enumerate(imagePaths):
+            # extract the person name from the image path (folder name)
+            name = imagePath.split(os.path.sep)[-2]
+            # load the input image and convert it from BGR (OpenCV ordering)
+            # to dlib ordering (RGB)
+            image = cv2.imread(imagePath)
+            rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            #Use Face_recognition to locate faces
+            boxes = face_recognition.face_locations(rgb,model='hog')
+            # compute the facial embedding for the face
+            encodings = face_recognition.face_encodings(rgb, boxes)
+            # loop over the encodings
+            for encoding in encodings:
+                knownEncodings.append(encoding)
+                knownNames.append(name)
+        #save emcodings along with their names in dictionary data
+        data = {"encodings": knownEncodings, "names": knownNames}
+        
+        if opentxtmode == "ab":
+            #print("Appending Data = ",data,f" to {embeddings_path}")
+            # load the known faces and embeddings saved in last file
+            orig_data = pickle.loads(open(embeddings_path, "rb").read())
+            data["encodings"] = orig_data["encodings"] + data["encodings"]
+            data["names"]     = orig_data["names"]     + data["names"]
+        
+        #use pickle to save data into a file named after the data folder for later use
+        f = open(embeddings_path,"wb")
+        f.write(pickle.dumps(data))
+        f.close()
+        
+        if make_default:
+            sleep(1)
+            print(f"\nSetting current embedding at {embeddings_path} as default({self.default_embeddings_path}).")
+            #use pickle to save data into a file named after the data folder for later use
+            f = open(self.default_embeddings_path,"wb")
+            f.write(pickle.dumps(data))
+            f.close()
+
+
         
     def get_embeddings(self,dataset_dir="",embeddings_path=""):
         if embeddings_path!="":
@@ -211,8 +210,6 @@ class face_recognition_dlib():
             exit(0)
         return data
 
-
-
     def preprocess(self,frame,frame_draw,rgb_small_frame = None,bboxes = [],face_locations = []):
                 
         # Write Code here...
@@ -220,5 +217,22 @@ class face_recognition_dlib():
     
     def recognize(self,rgb_small_frame,face_locations,data):
         
-        # Write code here....
-        pass
+        # Step 2 & 3 [Alignment + Representation]
+        face_encodings = face_recognition.face_encodings(rgb_small_frame,face_locations)
+        
+        face_identities = []
+        for face_encoding in face_encodings:
+            matches = face_recognition.compare_faces(data["encodings"],face_encoding,config.recog_tolerance)
+            
+            name = "Unknown"
+            
+            face_distances = face_recognition.face_distance(data["encodings"],face_encoding)
+            min_dist_idx = np.argmin(face_distances)
+            
+            if matches[min_dist_idx]:
+                name = data["names"][min_dist_idx]
+                
+            face_identities.append(name)
+            
+        
+        return face_identities
