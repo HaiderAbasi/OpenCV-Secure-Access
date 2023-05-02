@@ -3,6 +3,19 @@ Secure Access System
 
 This is a Python-based secure access system that uses facial recognition and tracking to authenticate authorized personnel.
 
+
+![alt text](https://github.com/HaiderAbasi/OpenCV-Secure-Access/blob/dev_haider_sadlib/assets/Secure_Acceess_demo.gif)
+
+
+Features
+------------
+- Only allow device/premises access 🔓 to authorized individuals. 
+
+- Annoy 😠 kids away by disrupting their mouse/keyboard commands. 
+- Lockout crucial files/folders 🚫 from specified individuals. 
+> (To-do)
+    - Gather complete activity-data for selected users. 
+
 Requirements
 ------------
 To run this project, you need to have the following Python packages installed:
@@ -16,6 +29,7 @@ You can install these packages by running the following command:
 ```console
 pip install -r requirements.txt
 ```
+> Tested only on **Windows10**.
 
 Usage
 -----
@@ -69,6 +83,19 @@ The main file of the secure access system is core.py, which contains the secure_
 └──utilities.py
 ```
 
+Standalone executable (pyinstaller) [Ref](https://github.com/ageitgey/face_recognition/issues/357)
+---------------------------------------
+```
+# 1) Install pyinstaller module
+pip install --upgrade pyinstaller
+
+# 2) Configure core.spec according to your requirements
+
+# 3) Create executable using pyinstaller
+pyinstaller .\core.spec
+```
+
+
 Contribution
 ------------
 If you'd like to contribute to this project, please fork the repository and make a pull request.
@@ -76,3 +103,14 @@ If you'd like to contribute to this project, please fork the repository and make
 License
 ------------
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+
+Thanks
+------------
+Thank you 👏 [ageitgey](https://github.com/ageitgey).
+
+Your work has made using face recognition  in projects a walk in the park. 
+
+Also, thanks to [Davis King](https://github.com/davisking) ([@nulhom](https://twitter.com/nulhom)) for creating dlib and for providing the trained facial feature detection and face encoding models used in this library.
+
+Keep the OpenSource torch lit! 🔥

@@ -10,7 +10,6 @@ from multiprocessing import freeze_support,active_children
 
 # System Imports
 import subprocess
-import ctypes
 
 # Face Recognition Core Imports
 from multi_object_tracking import multitracker
@@ -20,13 +19,17 @@ import face_recognition # Reference (Cross-Platform-Path) = https://stackoverflo
 # Utility Imports
 import config
 from collections import deque
-from utilities import get_iou,to_ltrd,to_ltwh,draw_fancy_bbox,put_Text
+from utilities import get_iou,to_ltrd,to_ltwh,put_Text,putText
+
+# Security Action
+from access_control import SecurityActions
+
+import datetime
 
 
 class secure_access_cv:
 
     def __init__(self):
-        
         # [1: Object Tracker] Loading MultiTracker class for multiple face tracking after detectionh
         self.m_tracker = multitracker(config.tracker_type)
         # [2: Recognition] Loading Face Recognition performing recogntion on detected faces
@@ -53,9 +56,7 @@ class secure_access_cv:
         self.identifying_faces = False # Performing face identification at this iteration?
 
         # Device Action Variables
-        self.invoke_screenlock = False
-        self.max_wait = 50
-        self.lock_iter = 0
+        self.security_actns = SecurityActions()
         
              
     def update_state(self,frame):
@@ -78,14 +79,13 @@ class secure_access_cv:
         # Updating and displaying application status
         app_state = f"Detector = {config.face_detector}, Mode = {self.m_tracker.mode} \n{self.currently_recognizing} face/es - {len(children)} subprocess!"
         put_Text(frame,app_state,(20,60))
-        
+     
     def identify(self):
         """
         function to extract data from a Face recognizer child process, 
         then process it to the desired format, and perform necessary actions
         based on the identities obtained.
         """
-
         elasped_time = time.time() - self.start_time
         #print("elasped_time = ",elasped_time)
         if (elasped_time % 1)< 0.2:
@@ -93,8 +93,6 @@ class secure_access_cv:
             if not self.futures.running():
                 
                 if self.identifying_faces:
-                    print("\n Identifying Faces....")
-                    extract_recog_result_start = time.time()
                     
                     try:
                         self.face_identities = self.futures.result(timeout=0.005)  # wait up to 1 milli second for the result
@@ -102,8 +100,6 @@ class secure_access_cv:
                         # executor is busy, skip this task
                         return
                                         
-                    extract_recog_result_mini_time = time.time() - extract_recog_result_start
-                    print(f"** extract_recog_result_mini_time = {extract_recog_result_mini_time}** ")
 
 
                     for iter, name in enumerate(self.face_identities):
@@ -149,25 +145,21 @@ class secure_access_cv:
                         del self.voting_dict[id]
                         if id in self.tar_counter:
                             del self.tar_counter[id]
-                            #print("deleting tac counter = ",self.tar_counter)
                         if id in self.last_recog_time:
                             del self.last_recog_time[id]
-                            #print("deleting last_recog_time = ",self.last_recog_time)
                         if id in self.perform_recog:
                             del self.perform_recog[id]
-                            #print("deleting perform_recog = ",self.perform_recog)
 
                     # check if all tracked object has received 3 consecutive unauthorized votes
                     screenlock_votes = [vote_count == 0 for vote_count in self.voting_dict.values()]
+
                     if all(screenlock_votes):
-                        self.invoke_screenlock = True # lock the screen if any object has received 3 consecutive unauthorized votes
-                        self.lock_iter = 0
-                    else:
-                        self.invoke_screenlock = False # don't lock the screen if no object has received 3 consecutive unauthorized votes
-                    
-                    extract_recog_result_time = extract_recog_result_start - time.time()
-                    print(f"** extract_recog_result_time = {extract_recog_result_time}** ")
-               
+                        self.security_actns.mode = "lock"
+                    elif len(self.face_identities)==1 and self.face_identities[0] == config.user_to_annoy:
+                        self.security_actns.mode = "annoy"
+                    elif len(self.face_identities)==1 and self.face_identities[0] == config.user_to_restrict:
+                        self.security_actns.mode = "restrict"
+                        
                     
     def activate_sa(self,vid_id,dataset_dir =""):   
         """
@@ -183,9 +175,7 @@ class secure_access_cv:
         
         # Get embeddings [encodings + Names]
         data = self.face_recog.get_embeddings(dataset_dir)
-        # print("data = ",data)
-        # cv2.waitKey(0)
-        
+
         if config.ignore_Warning_MMSF or isinstance(vid_id, str):
             # Debugging on a stored video...
             cap = cv2.VideoCapture(vid_id)
@@ -196,15 +186,31 @@ class secure_access_cv:
             print(f"\n[Error]: Unable to create a VideoCapture object at {vid_id}")
             return
         
+        if config.write_vid:
+            # get the input video resolution
+            frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            
+            # set the codec and create a VideoWriter object
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+            # get the current date and time
+            now = datetime.datetime.now()
+            date_time = now.strftime("%Y-%m-%d_%H-%M-%S")
+
+            # set the output file name
+            output_file = f"{date_time}.mp4"
+            out = cv2.VideoWriter(output_file, fourcc, 24, (frame_width, frame_height))
+        
         # Adjusting downscale config parameter based on video size. If video frame is large we can downscale more without losing appropriate data
         vid_width  = cap.get(cv2.CAP_PROP_FRAME_WIDTH)   # float `width`
-        config.downscale = int(vid_width/config.exp_width) * config.downscale 
-                
-        dth_frame = 15
+        config.downscale = int(vid_width/config.exp_width) * config.downscale
+        #config.downscale = 1
+        dth_frame = 10
         upsample_detection = 1
         if config.debug:
             upsample_detection = 2
         
+        strt_time = time.time()
         frame_iter = 0 # Current frame iteration
         while cap.isOpened():
             start_time = time.time() # Get the intial time
@@ -266,6 +272,9 @@ class secure_access_cv:
                         
                         self.start_time = time.time()
                         self.identifying_faces = True
+                else:
+                    # No face detected--> Reset mode to None
+                    self.security_actns.mode = ""
 
             else:
                 # If detector detected faces other then already tracking. Append them to tracked faces
@@ -325,8 +334,6 @@ class secure_access_cv:
                     # for a long time
                     if ( not self.futures.running() and any(self.perform_recog.values()) ):
                         # Case #3: Faces were detected but all were already tracked
-                        #print("Performing recognition again.....")
-                        recog_while_track_start = time.time()
                         # if the previous future has completed or has not started yet, cancel it
                         if self.futures:
                             # Cancel the future object
@@ -345,8 +352,6 @@ class secure_access_cv:
                         self.currently_recognizing = "Single"
                         if len(face_locations)>1:
                             self.currently_recognizing = "Multiple"
-                        recog_while_track_time = recog_while_track_start - time.time()
-                        print(f"** recog_while_track_time = {recog_while_track_time}** ")
                                                 
                     # Check if recognizer has finshed processing?
                     # a) If friendly face present --> Allow access! + Replace (track_id <---> recognized name) and color
@@ -360,35 +365,23 @@ class secure_access_cv:
                 # Updating state to current for displaying...
                 self.update_state(frame_draw)
                 
-
-            if self.invoke_screenlock:
-                s=(5,5)
-                e=(frame_draw.shape[1]-5,frame_draw.shape[0]-5)
-                draw_fancy_bbox(frame_draw,s,e,(0,0,255),4,style ='dotted')
-                cv2.putText(frame_draw,f">>> Unauthorized access <<<",(int(frame_draw.shape[1]/2)-155,30),cv2.FONT_HERSHEY_DUPLEX,0.7,(128,0,128),2)
-                #cv2.putText(frame_draw, f"Unauthorized access!" ,(20,40) ,cv2.FONT_HERSHEY_DUPLEX, 1, (0,0,255))
-                cv2.putText(frame_draw, f"Locking in {self.max_wait-self.lock_iter} s" ,(20,60) ,cv2.FONT_HERSHEY_DUPLEX, 1, (128,0,255))
-                self.lock_iter = self.lock_iter + 1
-                
-                r,c = frame_draw.shape[0:2]
-                r_s = int(r*0.2)
-                r_e = r - r_s
-                
-                t_elpsd_p = 1 - ((self.max_wait - self.lock_iter)/self.max_wait)
-                r_ln = r_e - r_s
-                
-                cv2.rectangle(frame_draw,(50,r_s),(80,r_e),(0,0,128),2)
-                
-                cv2.rectangle(frame_draw,(52,r_s + int(r_ln*t_elpsd_p)),(78,r_e),(0,140,255),-1)
-                
-                if self.lock_iter== self.max_wait:
-                    self.invoke_screenlock = False
-                    ctypes.windll.user32.LockWorkStation()
+            # Taking appropriate security measures for the user identified.
+            self.security_actns.perform_security_actions(frame_draw)
             
             waitTime = 1
             if config.debug:
                 waitTime = 33
+    
+            if self.security_actns.mode == "annoy" or self.security_actns.mode == "restrict":
+                text_w = cv2.getTextSize(self.security_actns.mode, cv2.FONT_HERSHEY_PLAIN, 1, 2)[0][0]
+                putText(frame_draw, self.security_actns.mode, (frame_draw.shape[1]-text_w-int(0.18*text_w), 2),fontScale=1,thickness=2)
             
+            if config.write_vid:
+                # Write video to disk
+                out.write(frame_draw)
+                
+            if config.early_stopping and (time.time() - strt_time) > 50:
+                break
             if config.display or config.debug:
                 cv2.imshow('Video', frame_draw)
                 # Hit 'Esc' on the keyboard to quit!
@@ -399,6 +392,9 @@ class secure_access_cv:
             self.elapsed_time = (time.time() - start_time)*1000 # ms
             frame_iter = frame_iter + 1
 
+        if config.write_vid:
+            out.release()
+            
         # Release handle to the webcam
         cap.release()
         cv2.destroyAllWindows()
@@ -437,27 +433,31 @@ if __name__== "__main__":
 
     parser = argparse.ArgumentParser("--Secure Access--")
     parser.add_argument("-disp","--display", help="Flag to display GUI", action= "store_true" )
+    parser.add_argument("-write","--write_vid", help="Flag to write to disk", action= "store_true" )
+    parser.add_argument("-s","--display_state", type=bool,default=False )
     parser.add_argument("-d","--debug", help="Debug App", action= "store_true" )
     parser.add_argument("-exp","--experimental", help="Turn Experimental features On/OFF", type=bool,default=False)
     parser.add_argument("-w","--ignore_warnings", help="Ignore warning or not", type=bool,default=True)
-    parser.add_argument("-s","--display_state", help="display current (app) state",  action= "store_true")
     parser.add_argument("-fd","--face_detector", help="type of detector for face detection", type=str,default="hog")
     parser.add_argument("-ft","--tracker_type", help="type of tracker for face tracking", type=str,default="MOSSE")
     parser.add_argument("-ds","--downscale", help="downscale amount for faster recognition", type=int,default=2)# Default = 2 -> Seems adequate for video size of (Width,Height) = (640,480) ... After downsizing (320,240)
     parser.add_argument("-rt","--recog_tolerance", help="Adjust tolerance for recognition e.g: (Strict < 0.5 < Loose) ", type=float,default=0.6)# Default = 2 -> Seems adequate for video size of (Width,Height) = (640,480) ... After downsizing (320,240)
-    parser.add_argument("-nu","--new_user", help="Add new user to list of authorized personnels", type=str,default=None)
+    parser.add_argument("-nu","--new_user", help="Create new user as authorized individual", type=str,default=None)
+    parser.add_argument("-au","--add_user", help="Add new user to list of authorized personnels", type=str,default=None)
     args = parser.parse_args()
     
     # Set config variables based on parsed arguments
-    config.display = args.display
-    config.debug = args.debug
+    config.display = args.display if not config.display else config.display
+    config.write_vid = args.write_vid if not config.write_vid else config.write_vid
+    config.debug = args.debug if not config.debug else config.debug
     config.ignore_Warning_MMSF = args.ignore_warnings
-    config.display_state = args.display_state
+    config.display_state = args.display_state  if not config.display_state else config.display_state
     config.face_detector = args.face_detector
     config.tracker_type = args.tracker_type
     config.downscale = args.downscale
     config.recog_tolerance = args.recog_tolerance
     config.new_user = args.new_user
+    config.add_user = args.add_user
     config.experimental = args.experimental
     
     if config.experimental:

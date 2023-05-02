@@ -89,17 +89,17 @@ def put_Text(
 
 
 
-def putText(img, text,org=(0, 0),font=cv2.FONT_HERSHEY_PLAIN,fontScale=1,color=(0, 255, 0),thickness=1,color_bg=(0, 0, 0)):
-    FONT_SCALE = 2.5e-3  # Adjust for larger font size in all images
-    THICKNESS_SCALE = 2e-3  # Adjust for larger thickness in all images
-
-    if fontScale==1:
-        height, width= img.shape[:2]
-        fontScale = min(width, height) * FONT_SCALE
-        thickness = math.ceil(min(width, height) * THICKNESS_SCALE)
+def putText(img, text, org=(0, 0), font=cv2.FONT_HERSHEY_PLAIN, fontScale=1, color=(0, 255, 0), thickness=1, color_bg=(0, 0, 0)):
+    font_scale_factor=2.5e-3
+    thickness_scale_factor=2e-3
+    
+    height, width = img.shape[:2]
+    fontScale = min(width, height) * font_scale_factor * fontScale
+    thickness = math.ceil(min(width, height) * thickness_scale_factor * thickness)
 
     x, y = org
-    rect_x = x ; rect_y = y
+    rect_x = x
+    rect_y = y
     ext = 10
     if x > ext:
         rect_x = rect_x - ext
@@ -115,10 +115,16 @@ def putText(img, text,org=(0, 0),font=cv2.FONT_HERSHEY_PLAIN,fontScale=1,color=(
     if img.shape[0] - (rect_y + text_h) > ext:
         rect_h = rect_h + ext
 
-    #cv2.rectangle(img, org, (x + text_w, y + text_h), color_bg, -1)
-    cv2.rectangle(img, org, (rect_x + rect_w, rect_y + rect_h), color_bg, -1)
-    cv2.putText(img, text, (x,int( y + text_h + fontScale - 1)), font, fontScale, color, thickness)
+    margin = 0.10
 
+    x, y = org
+
+    rect_w += int(rect_w * margin)  # add margin to rect_w
+    rect_h += int(rect_h * margin)  # add margin to rect_h
+
+    cv2.rectangle(img, (rect_x - int(rect_w * margin), rect_y - int(rect_h * margin)), (rect_x + rect_w, rect_y + rect_h), color_bg, -1)
+    cv2.rectangle(img, (rect_x - int(rect_w * margin), rect_y - int(rect_h * margin)), (rect_x + rect_w, rect_y + rect_h), (255,255,255), 2)
+    cv2.putText(img, text, (rect_x + int((rect_w - text_w) *0.40), int(rect_y + rect_h * 0.6 + text_h / 4)), font, fontScale, color, thickness)
 
 
 class Gui():

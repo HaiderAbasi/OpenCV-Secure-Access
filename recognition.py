@@ -5,8 +5,9 @@ import pickle
 import face_recognition
 import sys
 
-from utilities import to_trbl,to_ltwh,list_images
+from utilities import to_trbl,to_ltwh,list_images,putText
 
+import time
 from time import sleep
 import config
 
@@ -20,11 +21,7 @@ class face_recognition_dlib():
 
     @staticmethod
     def __create_user_dataset(user_dataset_dir):
-        # [1: Face Detector] Loading cascade classifier as the fastest face detector in OpenCV
-        faceCascade = cv2.CascadeClassifier()
-        if not faceCascade.load(os.path.join(os.path.dirname(__file__),config.cascPathface)):
-            print(f'--(!)Error loading face cascade from {config.cascPathface}')
-            sys.exit(0)
+        
         if config.ignore_Warning_MMSF or isinstance(config.vid_id, str):
             # Debugging on a stored video...
             cap = cv2.VideoCapture(config.vid_id)
@@ -52,28 +49,24 @@ class face_recognition_dlib():
             if not ret:
                 print("No-more frames... :(\nExiting!!!")
                 break
+            
             frame_draw = frame.copy()
-            
             faces = [] # (x,y,w,h) bbox format
-            
             rgb_small_frame = None
+            
             # Step 1: Detecting face on every dth_frame             
             if frame_iter%dth_frame==0:
-                if config.face_detector=="hog":
-                    # Resize frame of video to 1/4 size for faster face recognition processing
-                    small_frame = cv2.resize(frame, (0, 0), fx=(1/config.downscale), fy=(1/config.downscale))
-                    # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
-                    rgb_small_frame = small_frame[:, :, ::-1]
-                    # Find all the faces and face encodings in the current frame of video
-                    face_locations = face_recognition.face_locations(rgb_small_frame)
-                    for face_loc in face_locations:
-                        face_loc_scaled = (face_loc[0]*config.downscale,face_loc[1]*config.downscale,face_loc[2]*config.downscale,face_loc[3]*config.downscale)
-                        faces.append(to_ltwh(face_loc_scaled,"css"))
-                        #top, right, bottom, left = face_loc_scaled
-                        #cv2.rectangle(frame_draw,(left,top),(right,bottom),(0,255,0),2)
-                else:
-                    gray = cv2.cvtColor(frame,cv2.COLOR_BGR2GRAY)
-                    faces = faceCascade.detectMultiScale(gray)          
+                # Resize frame of video to 1/4 size for faster face recognition processing
+                small_frame = cv2.resize(frame, (0, 0), fx=(1/config.downscale), fy=(1/config.downscale))
+                # Convert the image from BGR color (which OpenCV uses) to RGB color (which face_recognition uses)
+                rgb_small_frame = small_frame[:, :, ::-1]
+                # Find all the faces and face encodings in the current frame of video
+                face_locations = face_recognition.face_locations(rgb_small_frame)
+                for face_loc in face_locations:
+                    face_loc_scaled = (face_loc[0]*config.downscale,face_loc[1]*config.downscale,face_loc[2]*config.downscale,face_loc[3]*config.downscale)
+                    faces.append(to_ltwh(face_loc_scaled,"css"))
+                    #top, right, bottom, left = face_loc_scaled
+                    #cv2.rectangle(frame_draw,(left,top),(right,bottom),(0,255,0),2)
                 
                 if saving_user_face:
                     color = (0,255,0)
@@ -98,6 +91,8 @@ class face_recognition_dlib():
                 elif len(faces)>1:
                     cv2.putText(frame_draw, "Keep only {config.new_user} in front of the camera!" ,(20,40) ,cv2.FONT_HERSHEY_DUPLEX, 1, (0,0,255))
 
+            msg = "NOTE: Press (Enter) when ready to grab photos..!"
+            putText(frame_draw,msg,(20,20))
             cv2.imshow("New User Authorization",frame_draw)
             k = cv2.waitKey(1)
             if k==13:# Enter key
@@ -106,11 +101,13 @@ class face_recognition_dlib():
                 print("Exit key pressed...\nClosing App!")
                 sys.exit(0)
 
-    def __add_new_user(self,user_dataset_dir):
+    def __add_new_user(self,user_dataset_dir,write_mode = "wb"):
         image_dirs = list(list_images(os.path.join(os.path.dirname(__file__),user_dataset_dir)))
+        
         if not os.path.isdir(user_dataset_dir):
             print(f"\nCreated an empty directory at {user_dataset_dir}\n")
-            os.mkdir(user_dataset_dir)
+            #os.mkdir(user_dataset_dir)
+            os.makedirs(user_dataset_dir)
             print(f"\n1) Grab few photos of {config.new_user} live from camera feed..")
             print("\nNote: Press (Enter) when ready to grab photos..!")
             self.__create_user_dataset(user_dataset_dir)
@@ -123,7 +120,7 @@ class face_recognition_dlib():
         else:
             print(f"Dataset already available at {user_dataset_dir}\n")
         print(f"Generating {config.new_user} embeddings and appending to authorized personnel list.")
-        self.__generate_embeddings(user_dataset_dir,True,opentxtmode="ab")
+        self.__generate_embeddings(user_dataset_dir,False,opentxtmode=write_mode)
 
     def __generate_embeddings(self,data_dir,make_default = False,opentxtmode = "wb"):
 
@@ -196,7 +193,13 @@ class face_recognition_dlib():
                     print(f"\nAdding new user {config.new_user} to list of authorized personnel")
                     user_dataset_dir = os.path.join(os.path.dirname(__file__),os.path.join(config.authorized_dir,config.new_user))
                     # Add new user to list of authorized personnel
-                    self.__add_new_user(user_dataset_dir)
+                    self.__add_new_user(user_dataset_dir,"wb")
+                elif config.add_user is not None:
+                    print(f"\nAdding new user {config.add_user} to list of authorized personnel")
+                    user_dataset_dir = os.path.join(os.path.dirname(__file__),os.path.join(config.authorized_dir,config.add_user))
+                    # Add new user to list of authorized personnel
+                    self.__add_new_user(user_dataset_dir,"ab")
+         
                     
             # load the known faces and embeddings saved in last file
             data = pickle.loads(open(embeddings_path, "rb").read())
@@ -264,19 +267,57 @@ class face_recognition_dlib():
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
         face_identities = []
+        
         for face_encoding in face_encodings:
             # Step 4: Compare encodings with encodings in data["encodings"]
-            #Matches contain array with boolean values and True for the embeddings it matches closely
-            #and False for rest
-            matches = face_recognition.compare_faces(data["encodings"], face_encoding,config.recog_tolerance)
-            
             name = "Unknown"
+            
             # Use the known face with the smallest distance to the new face
             face_distances = face_recognition.face_distance(data["encodings"], face_encoding)
-            best_match_index = np.argmin(face_distances)
-            if matches[best_match_index]:
-                name = data["names"][best_match_index]
+
+            faces_matched = face_distances < config.recog_tolerance
+            # Create a dictionary to store the number of matches for each person
+            match_counts = {}
+            # Initialize the match_counts dictionary with a value of 0 for each name
+            match_counts = {name: 0 for name in set(data["names"])}
+            match_distances = {name: 0 for name in set(data["names"])}
+
+            # Convert the numpy array to a list and count the number of matches for each name
+            for idx,is_matched in enumerate(faces_matched):
+                match_counts[data["names"][idx]] = match_counts[data["names"][idx]] + 1 if is_matched else match_counts[data["names"][idx]]
+                match_distances[data["names"][idx]] = match_distances[data["names"][idx]] + face_distances[idx] if is_matched else match_distances[data["names"][idx]]
+
+            match_distances = {key: value for key, value in match_distances.items() if value != 0}
+            matched_counts = {key: value for key, value in match_counts.items() if value != 0}
+
+            if config.verbose:
+                print("matched_counts = ",match_counts)
+
+            if match_counts and len(matched_counts)<3:
+                # Find the person with the most matches
+                max_matches = max(match_counts.values())
+                max_match_names = [name for name, count in match_counts.items() if count == max_matches]
+
+                # Set confident flag based on the number of people with the most matches
+                if len(max_match_names) == 1:
+                    name = max_match_names[0]
+                elif len(max_match_names) == 2:
+                    per_a = max_match_names[0]
+                    per_b = max_match_names[1]
+                    #max_allowed = (match_counts[per_a] * config.recog_tolerance)
+                    min_allowed_diff = match_counts[per_a]*0.05
+                    difference = match_distances[per_a] - match_distances[per_b]
+                    if config.verbose:
+                        print("difference = ",difference)
+                    if abs(difference) > min_allowed_diff:
+                        if difference>0:
+                            name = per_b
+                        else:
+                            name = per_a
+            
                 
             face_identities.append(name)
+            if config.verbose:
+                print(face_distances ,"\n predicted = ",name)
 
         return face_identities
