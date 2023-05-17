@@ -421,8 +421,8 @@ def demo():
     # Step 1: Loading the training and test data
     secure_acc = secure_access_cv()
 
-    test_vid_path = r"data\test\classroom.mp4"
-    dataset_dir = r"data\test\known"
+    test_vid_path = r"data\test\classroom.mp4".replace('\\','/')
+    dataset_dir = r"data\test\known".replace('\\','/')
 
     secure_acc.activate_sa(os.path.abspath(test_vid_path),dataset_dir= os.path.abspath(dataset_dir))
 

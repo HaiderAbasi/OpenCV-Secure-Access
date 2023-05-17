@@ -5,11 +5,11 @@ block_cipher = None
 
 
 models = [
-('.\\models\\dlib_face_recognition_resnet_model_v1.dat', './face_recognition_models/models'),
-('.\\models\\mmod_human_face_detector.dat', './face_recognition_models/models'),
-('.\\models\\shape_predictor_5_face_landmarks.dat', './face_recognition_models/models'),
-('.\\models\\shape_predictor_68_face_landmarks.dat', './face_recognition_models/models'),
-('.\\models\\authorized_personnels-live_embeddings-face_enc', './models'),
+('./models/dlib_face_recognition_resnet_model_v1.dat', './face_recognition_models/models'),
+('./models/mmod_human_face_detector.dat', './face_recognition_models/models'),
+('./models/shape_predictor_5_face_landmarks.dat', './face_recognition_models/models'),
+('./models/shape_predictor_68_face_landmarks.dat', './face_recognition_models/models'),
+('./models/authorized_personnels-live_embeddings-face_enc', './models'),
 ]
 
 a = Analysis(

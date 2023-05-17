@@ -16,7 +16,7 @@ import concurrent.futures
 from multiprocessing import Value
 
 from utilities import draw_fancy_bbox
-
+import config
 
 class SecurityActions:
     def __init__(self):
@@ -31,7 +31,7 @@ class SecurityActions:
         self.enable_annoy = Value('i', 0)
         
         self.folder_hidden = False
-        self.folder_path = r"D:\Haider\Udemy\Private"
+        self.folder_path = config.folder_to_hide
         
         
         # Register a function to unhide the folder when the program exits
@@ -149,23 +149,52 @@ class SecurityActions:
         #print("Finished ....")
         
 
-    def __lock_and_hide_folder(self,lock=True):
-        try:
-            if lock:
-                subprocess.call(['attrib', '+h', '+s', self.folder_path])
+    def __lock_and_hide_folder(self):
+        if platform.system() == 'Windows':
+            try:
+                subprocess.call(['attrib', '+h', self.folder_path])
+                subprocess.call(['attrib', '+s', self.folder_path])
                 subprocess.call(['cacls', self.folder_path, '/e', '/p', '%s:n' % os.getlogin()])
-            else:
-                subprocess.call(['cacls', self.folder_path, '/e', '/p', '%s:f' % os.getlogin()])
-                subprocess.call(['attrib', '-h', '-s', self.folder_path])
-        except Exception as e:
-            print(f"An error occurred while hiding/unhiding {self.folder_path}: {e}")
+            except Exception as e:
+                print(f"An error occurred while hiding and locking the folder {self.folder_path} in Windows: {e}")
+        else:
+            try:
+                os.chmod(self.folder_path, 0o700)
+                folder_name = os.path.basename(self.folder_path)
+                parent_path = os.path.dirname(self.folder_path)
+                hidden_folder_path = os.path.join(parent_path, f".{folder_name}")
+                os.rename(self.folder_path, hidden_folder_path)
+            except Exception as e:
+                print(f"An error occurred while hiding and locking the folder {self.folder_path} in Linux: {e}")
+                
 
+    def __unlock_and_unhide_folder(self):
+        if platform.system() == 'Windows':
+            try:
+                subprocess.call(['attrib', '-h', self.folder_path])
+                subprocess.call(['attrib', '-s', self.folder_path])
+                subprocess.call(['cacls', self.folder_path, '/e', '/p', '%s:f' % os.getlogin()])
+            except Exception as e:
+                print(f"An error occurred while unhiding and unlocking the folder {self.folder_path} in Windows: {e}")
+        else:
+            try:
+                parent_path = os.path.dirname(self.folder_path)
+                folder_name = os.path.basename(self.folder_path)
+                visible_folder_path = self.folder_path
+                if folder_name[0] ==".":
+                    visible_folder_path = os.path.join(parent_path, folder_name[1:])
+                    os.rename(self.folder_path, visible_folder_path)
+                os.chmod(visible_folder_path, 0o755)
+            except Exception as e:
+                print(f"An error occurred while unhiding and unlocking the folder {self.folder_path} in Linux: {e}")
+
+    
     def lockout_access(self, hide=True):
         try:
             if hide:
-                self.__lock_and_hide_folder(True)  # 0x02 is the code for hidden attribute
+                self.__lock_and_hide_folder()  # 0x02 is the code for hidden attribute
             else:
-                self.__lock_and_hide_folder(False)
+                self.__unlock_and_unhide_folder()
         except Exception as e:
             print(f"An error occurred while hiding/unhiding {self.folder_path}: {e}")
             

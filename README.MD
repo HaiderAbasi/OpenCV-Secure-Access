@@ -19,17 +19,39 @@ Features
 Requirements
 ------------
 To run this project, you need to have the following Python packages installed:
+- For Ubuntu 
+  - Install python 3.8 using the following steps [(Ref)](https://www.linuxcapable.com/install-python-3-8-on-ubuntu-linux/)
+    ```console
+    sudo add-apt-repository ppa:deadsnakes/ppa -y
+    sudo apt install python3.8
+    sudo apt install python3.8-distutils
+    sudo apt install python3.8-dev
+    sudo apt install python3.8-tk
+    ```
+  - Setup and activate virtual environment inside the repository
+    ```console
+    sudo apt install pip -y
+    python3 -m pip install --user virtualenv
+    python3 -m virtualenv sa_venv -p /usr/bin/python3.8
+    source sa_venv/bin/activate
+    ```
+  - Install required modules using the following two commands.
+    ```console
+    pip install -r prequirements.txt
+    pip install -r requirements.txt
+    ```
+  - Test the application by running core.py
 
-- opencv-contrib-python==4.4.0.46
-- dlib
-- face_recognition
 
-You can install these packages by running the following command:
+- For Windows 
 
-```console
-pip install -r requirements.txt
-```
-> Tested only on **Windows10**.
+  - Download and install Python 3.8.10.
+  - Setup a virtual environment inside the repository.
+  - You can install these packages by running the following command:
+
+    ```console
+    pip install -r requirements.txt
+    ```
 
 Usage
 -----

@@ -1,7 +1,7 @@
 # Normal/Debug Mode
 # # Normal : Secure access on Live/Video
 # # Debug  : Secure access on a test video to validate its working
-debug = False
+debug = True
 
 # Debugging controls
 display = True
@@ -13,6 +13,12 @@ verbose = 0
 # Access Control
 user_to_annoy = "arsal"
 user_to_restrict = "taha"
+
+# Beware! Test first on dummy folder about its effects
+# Windows
+#folder_to_hide = r"D:\Haider\Udemy\Private" # Set this to any folder on your system. 
+# Ubuntu
+folder_to_hide = r"/home/shadowmaster/Documents/Private" # Set this to any folder on your system. 
 
 # Video Path or camera number
 vid_id = None
