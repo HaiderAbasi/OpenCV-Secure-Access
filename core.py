@@ -19,7 +19,7 @@ import face_recognition # Reference (Cross-Platform-Path) = https://stackoverflo
 # Utility Imports
 import config
 from collections import deque
-from utilities import get_iou,to_ltrd,to_ltwh,put_Text,putText
+from utilities import get_iou,to_ltrd,to_ltwh,put_Text,putText,download_missing_model_files
 
 # Security Action
 from access_control import SecurityActions
@@ -153,7 +153,7 @@ class secure_access_cv:
                     # check if all tracked object has received 3 consecutive unauthorized votes
                     screenlock_votes = [vote_count == 0 for vote_count in self.voting_dict.values()]
 
-                    if all(screenlock_votes):
+                    if len(screenlock_votes)!=0 and all(screenlock_votes):
                         self.security_actns.mode = "lock"
                     elif len(self.face_identities)==1 and self.face_identities[0] == config.user_to_annoy:
                         self.security_actns.mode = "annoy"
@@ -170,6 +170,7 @@ class secure_access_cv:
         dataset_dir: The path to the directory containing the images to use for training the face recognition model.
         
         """
+        
         print("Activating Secure Access....\n Authorized personnel only!")
         config.vid_id = vid_id
         
@@ -394,7 +395,10 @@ class secure_access_cv:
 
         if config.write_vid:
             out.release()
-            
+        
+        # Cancel and stop any running processes
+        self.futures.cancel()
+        del self.futures
         # Release handle to the webcam
         cap.release()
         cv2.destroyAllWindows()

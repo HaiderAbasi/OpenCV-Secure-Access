@@ -2,6 +2,10 @@ import cv2
 import os
 import math
 import numpy as np
+import gdown
+import subprocess
+
+
 
 def print_h(str):
     print(f"\n##############################################\n{str}")
@@ -607,3 +611,29 @@ def list_files(basePath, validExts=None, contains=None):
                 # construct the path to the image and yield it
                 imagePath = os.path.join(rootDir, filename)
                 yield imagePath
+
+
+def download_missing_model_files():
+    """Download missing model files from Google Drive."""
+    models_dir = os.path.join(os.getcwd(), 'models')
+    print("models_dir = ",models_dir)
+    model_files = ['dlib_face_recognition_resnet_model_v1.dat', 'mmod_human_face_detector.dat', 'shape_predictor_5_face_landmarks.dat', 'shape_predictor_68_face_landmarks.dat']  # replace with actual file names
+    files_id = ['1y4OcXnoYrfGqBUmbtkJdW3oOyi7V0WGc', '13APRbYSehF9Lv32CeBeqSbnIa3d8-TKc', '1sO85I7IrC7jlxc4YYDKAM6PaT8RTawe3','1TGZU8IGeYlD_o68HPtZeFsxbuj2NDHOh']  # replace with actual file IDs or URLs
+    
+    # Create model directory if it doesnot exist
+    if not os.path.exists(models_dir):
+        os.makedirs(models_dir)
+    
+    for i, file in enumerate(model_files):
+        file_path = os.path.join(models_dir, file)
+        if not os.path.exists(file_path):
+            print(f'{file} not found. Downloading...')
+            file_id = files_id[i]  # replace with the actual file ID or URL
+            if file_id.startswith('http'):
+                # Use curl to download the file
+                subprocess.run(['curl', '-L', file_id, '-o', file_path], check=True)
+            else:
+                # Use gdown to download the file from Google Drive
+                url = f'https://drive.google.com/uc?id={file_id}'
+                gdown.download(url, file_path, quiet=False)
+            print(f'{file} downloaded successfully!')

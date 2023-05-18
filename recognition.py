@@ -185,8 +185,19 @@ class face_recognition_dlib():
             foldername = os.path.basename(dataset_dir)
             embeddings_path = os.path.join(os.path.dirname(__file__),f"models/{foldername}-live_embeddings-face_enc")
             if not os.path.isfile(embeddings_path): # Only generate if not already present
-                print(f"Generating embeddings from given dataset at {dataset_dir}")
-                self.__generate_embeddings(dataset_dir,True)
+                if len(os.listdir(dataset_dir)) != 0:
+                    print(f"Generating embeddings from given dataset at {dataset_dir}")
+                    self.__generate_embeddings(dataset_dir,True)
+                else:
+                    print("\n--------------------------------------------------------------------------------------")
+                    print(f"\nLooks like a first run :)...\nWe will add you as an authorized personnel now!\n")
+                    name = input('====================== Enter your name ======================\n') 
+                    if name!="":
+                        user_dataset_dir = os.path.join(os.path.dirname(__file__),os.path.join(config.authorized_dir,name))
+                        self.__add_new_user(user_dataset_dir,"wb")
+                    else:
+                        print("No name provided!\nExiting!!!")
+                        sys.exit()
             else:
                 print(f"Embeddings already available at {embeddings_path}")
                 if config.new_user is not None:
@@ -278,32 +289,46 @@ class face_recognition_dlib():
             faces_matched = face_distances < config.recog_tolerance
             # Create a dictionary to store the number of matches for each person
             match_counts = {}
+            match_distances = {}
             # Initialize the match_counts dictionary with a value of 0 for each name
-            match_counts = {name: 0 for name in set(data["names"])}
-            match_distances = {name: 0 for name in set(data["names"])}
+            #match_counts = {name: 0 for name in set(data["names"])}
+            #match_distances = {name: 0 for name in set(data["names"])}
+            for d_name in data["names"]:
+                if d_name not in match_counts.keys():
+                    match_counts[d_name] = 0
+                    match_distances[d_name] = 0
 
             # Convert the numpy array to a list and count the number of matches for each name
             for idx,is_matched in enumerate(faces_matched):
                 match_counts[data["names"][idx]] = match_counts[data["names"][idx]] + 1 if is_matched else match_counts[data["names"][idx]]
                 match_distances[data["names"][idx]] = match_distances[data["names"][idx]] + face_distances[idx] if is_matched else match_distances[data["names"][idx]]
 
-            match_distances = {key: value for key, value in match_distances.items() if value != 0}
-            matched_counts = {key: value for key, value in match_counts.items() if value != 0}
-
             if config.verbose:
-                print("matched_counts = ",match_counts)
+                print("\nmatched_counts = ",match_counts)
+                
+            match_counts = {key: value for key, value in match_counts.items() if value != 0}
+            match_distances = {key: value for key, value in match_distances.items() if value != 0}
 
-            if match_counts and len(matched_counts)<3:
+
+            if match_counts and len(match_counts)<3:
                 # Find the person with the most matches
                 max_matches = max(match_counts.values())
-                max_match_names = [name for name, count in match_counts.items() if count == max_matches]
-
+                max_match_names = [name_ for name_, count in match_counts.items() if count == max_matches]
+                
+                if config.verbose:
+                    print("faces_matched = ",faces_matched)
+                    print("max_match_names = ",max_match_names)
+                
                 # Set confident flag based on the number of people with the most matches
                 if len(max_match_names) == 1:
                     name = max_match_names[0]
                 elif len(max_match_names) == 2:
                     per_a = max_match_names[0]
                     per_b = max_match_names[1]
+                    
+                    if config.verbose:
+                        print(f"per_a = {per_a} - per_b = {per_b}")
+                    
                     #max_allowed = (match_counts[per_a] * config.recog_tolerance)
                     min_allowed_diff = match_counts[per_a]*0.05
                     difference = match_distances[per_a] - match_distances[per_b]
@@ -314,7 +339,6 @@ class face_recognition_dlib():
                             name = per_b
                         else:
                             name = per_a
-            
                 
             face_identities.append(name)
             if config.verbose:

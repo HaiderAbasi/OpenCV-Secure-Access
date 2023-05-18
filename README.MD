@@ -43,15 +43,24 @@ To run this project, you need to have the following Python packages installed:
   - Test the application by running core.py
 
 
-- For Windows 
+- For Windows 10
 
-  - Download and install Python 3.8.10.
-  - Setup a virtual environment inside the repository.
-  - You can install these packages by running the following command:
+  - Download and install Python 3.8.10.- x64
+    - [Link](https://www.python.org/downloads/release/python-3810/)
+  - Setup a virtual environment and activate it inside the repository.
+    ```console
+    python -m pip install --user virtualenv
+    python -m virtualenv sa_venv -p C:/Users/cripplegen/AppData/Local/Programs/Python/Python38/python.exe
+    cd .\sa_venv\Scripts\
+    activate
+    ```
+  - You can install required packages by running the following command:
 
     ```console
-    pip install -r requirements.txt
+    pip install -r win_requirements.txt
     ```
+  - Select the virutal environment Python in VScode
+  - Run core.py (Use config.py to switch between debug/live)
 
 Usage
 -----
