@@ -126,6 +126,10 @@ pip install --upgrade pyinstaller
 pyinstaller .\core.spec
 ```
 
+Star History
+------------
+[![Star History Chart](https://api.star-history.com/svg?repos=HaiderAbasi/OpenCV-Secure-Access&type=Date)](https://star-history.com/#HaiderAbasi/OpenCV-Secure-Access&Date)
+
 
 Contribution
 ------------
