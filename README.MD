@@ -1,3 +1,5 @@
+
+
 Secure Access System
 --------------------
 
@@ -109,6 +111,7 @@ The main file of the secure access system is core.py, which contains the secure_
 ├──core.spec > (File for pyinstaller to generate executable for app)
 |
 +──core.py    > (Main file to run Secure Access App)
+├──access_control.py
 ├──multi_object_tracking.py
 ├──recognition.py
 └──utilities.py
